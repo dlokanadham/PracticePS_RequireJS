@@ -1,99 +1,154 @@
-/* create DOM task elements */
 
-var taskTemplate = '<li class="task"><input class="complete" type="checkbox" /> <input class="description" type="text" placeholder="Enter task description..." /> <button class="delete-button">Delete</button></li>';
-
-function renderTasks(tasks) {
-    var elementArray = $.map(tasks, _renderTask);
-
-    $("#task-list")
-        .empty()
-        .append(elementArray);
-}
-
-function renderNew() {
-    var $taskList = $("#task-list");
-    $taskList.prepend(_renderTask({}));
-}
-
-function _renderTask(task) {
-    var $task = $(taskTemplate);
-    if(task.complete) {
-        $task.find(".complete").attr("checked", "checked");
+require.config({
+    paths:{
+        jquery:"jquery-2.1.1.min"
     }
-    $task.find(".description").val(task.description);
-    return $task;
-}
+});
 
-/* load and save data */
 
-var STORE_NAME = "tasks";
+define('taskData',[], function(){
+    'use strict';
+    /* load and save data */
 
-function saveTaskData (tasks) {
-    localStorage.setItem(STORE_NAME, JSON.stringify(tasks));
-}
+    var STORE_NAME = "tasks";
 
-function loadTaskData () {
-    var storedTasks = localStorage.getItem(STORE_NAME);
-    if(storedTasks) {
-        return JSON.parse(storedTasks);
+    function saveTaskData (tasks) {
+        localStorage.setItem(STORE_NAME, JSON.stringify(tasks));
     }
-    return [];
-}
 
-function clearTaskData () {
-    localStorage.removeItem(STORE_NAME);
-}
+    function loadTaskData () {
+        var storedTasks = localStorage.getItem(STORE_NAME);
+        if(storedTasks) {
+            return JSON.parse(storedTasks);
+        }
+        return [];
+    }
 
-/* task management */
+    function clearTaskData () {
+        localStorage.removeItem(STORE_NAME);
+    }
 
-function add() {
-    renderNew();
-}
+    return{
+    save:saveTaskData,
+    load:loadTaskData,
+    clear:clearTaskData
+    };
+});
 
-function remove(clickEvent) {
-	var taskElement = clickEvent.target;
-    $(taskElement).closest(".task").remove();
-}
+define('taskRenderer',["jquery"], function($){
 
-function clear() {
-    clearTaskData();
-    render();
-}
+        var taskTemplate = '<li class="task"><input class="complete" type="checkbox" /> <input class="description" type="text" placeholder="Enter task description..." /> <button class="delete-button">Delete</button></li>';
 
-function save() {
-    var tasks = [];
-    $("#task-list .task").each(function (index, task) {
-        var $task = $(task);
-        tasks.push({
-            complete: $task.find(".complete").prop('checked'),
-            description: $task.find(".description").val()
-        });
-    });
+        function renderTasks(tasks) {
+            var elementArray = $.map(tasks, _renderTask);
 
-    saveTaskData(tasks);
-}
+            $("#task-list")
+                .empty()
+                .append(elementArray);
+        }
 
-function cancel() {
-    render();
-}
+        function renderNew() {
+            var $taskList = $("#task-list");
+            $taskList.prepend(_renderTask({}));
+        }
 
-function render() {
-    renderTasks(loadTaskData());
-}
+        function _renderTask(task) {
+            var $task = $(taskTemplate);
+            if(task.complete) {
+                $task.find(".complete").attr("checked", "checked");
+            }
+            $task.find(".description").val(task.description);
+            return $task;
+        }
 
-/* register event handlers */
+        return{
+            renderTasks :renderTasks,
+            renderNew : renderNew
+        }
+})
 
-function registerEventHandlers() {
-	$("#new-task-button").on("click", add);
-	$("#delete-all-button").on("click", clear);
-	$("#save-button").on("click", save);
-	$("#cancel-button").on("click", cancel);
-	$("#task-list").on("click", ".delete-button", remove);
-}
+define('tasks',["jquery", "taskData","taskRenderer"], function($, taskData, taskRenderer){
+    
+            function add() {
+            taskRenderer.renderNew();
+        }
 
-/* initialize application */
+        function remove(clickEvent) {
+            var taskElement = clickEvent.target;
+            $(taskElement).closest(".task").remove();
+        }
 
-$(function () {
-	registerEventHandlers();
-	render();
+        function clear() {
+            taskData.clear();
+            render();
+        }
+
+        function save() {
+            var tasks = [];
+            $("#task-list .task").each(function (index, task) {
+                var $task = $(task);
+                tasks.push({
+                    complete: $task.find(".complete").prop('checked'),
+                    description: $task.find(".description").val()
+                });
+            });
+
+            taskData.save(tasks);
+        }
+
+        function cancel() {
+            render();
+        }
+
+        function render() {
+            taskRenderer.renderTasks(taskData.load());
+        }
+
+        return{
+            add:add,
+            remove:remove,
+            clear:clear,
+            save:save, 
+            cancel:cancel, 
+            render:render
+        }
+});
+
+define("app",["jquery", "tasks"], function($,tasks){
+
+    function _addTasks(){
+        tasks.add();
+    }
+    function _deleteAllTasks(){
+        tasks.clear();
+    }
+    function _saveChanges(){
+        tasks.save();
+    }
+    function _cancelChanges(){
+       tasks.cancel();
+    }
+    function _deleteTask(clickEvent){
+        tasks.remove(clickEvent);
+    }
+
+    function _registerEventHandlers() {
+        $("#new-task-button").on("click", _addTasks);
+        $("#delete-all-button").on("click", _deleteAllTasks);
+        $("#save-button").on("click", _saveChanges);
+        $("#cancel-button").on("click", _cancelChanges);
+        $("#task-list").on("click", ".delete-button", _deleteTask);
+    }
+
+    return {
+        init : function(){
+            _registerEventHandlers();
+            tasks.render();
+        }
+    }
+});
+
+require(["app"], function(app){
+    app.init();
+
 });
